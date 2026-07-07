@@ -26,7 +26,9 @@ let tempMasterCode = `GS-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
 // [디버깅 미들웨어] 모든 API 요청의 헤더와 엔드포인트를 실시간 감시
 app.use((req, res, next) => {
   console.log(`\n[▶ Request] ${req.method} ${decodeURIComponent(req.url)} | IP: ${req.ip}`);
-  if (Object.keys(req.body).length > 0) {
+  
+  // req.body가 존재하고 객체인지 확인한 후 keys를 호출합니다.
+  if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
     console.log(`    └─ Body Data:`, JSON.stringify(req.body));
   }
   next();
