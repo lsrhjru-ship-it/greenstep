@@ -7,7 +7,9 @@ const crypto = require('crypto');
 const path = require('path'); // 웹 페이지 경로 바인딩을 위해 추가
 
 const app = express();
-const PORT = 26685;
+
+// 🔄 [수정] Render 환경의 포트를 자동으로 감지하고, 없을 때만 26685를 사용합니다.
+const PORT = process.env.PORT || 26685;
 
 const NEIS_API_KEY = '7134e6ee67034ecca9e2126aba6089a6'; 
 const KAKAO_JS_KEY = '5ebba637286876de21f738703d517089'; 
@@ -16,7 +18,6 @@ app.use(cors());
 app.use(express.json());
 
 // 📁 [웹 접속 오류 해결] HTML, CSS, JS 프론트엔드 정적 파일 연동 설정
-// 서버 스크립트와 같은 경로에 index.html 파일이 존재한다면 정상 노출됩니다.
 app.use(express.static(path.join(__dirname)));
 
 // 🔐 [서버 시작 시 무작위 일회용 마스터 인증코드 최초 발급]
@@ -26,7 +27,7 @@ let tempMasterCode = `GS-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
 app.use((req, res, next) => {
   console.log(`\n[▶ Request] ${req.method} ${decodeURIComponent(req.url)} | IP: ${req.ip}`);
   if (Object.keys(req.body).length > 0) {
-    console.log(`   └─ Body Data:`, JSON.stringify(req.body));
+    console.log(`    └─ Body Data:`, JSON.stringify(req.body));
   }
   next();
 });
@@ -121,12 +122,12 @@ app.post('/api/admin/login', async (req, res) => {
   console.log(`[🔐 로그인 시도] 계정명: ${admin_name || '미지정'} | 시도한 비번: ${password}`);
 
   if (!password) {
-    console.log(`   └─ [결과 실패] 패스워드 파라미터가 누락되었습니다.`);
+    console.log(`    └─ [결과 실패] 패스워드 파라미터가 누락되었습니다.`);
     return res.status(400).json({ success: false, error: "데이터 누락" });
   }
 
   if (!tempMasterCode) {
-    console.log(`   └─ [결과 실패] 이미 소진된 마스터 코드 접근입니다.`);
+    console.log(`    └─ [결과 실패] 이미 소진된 마스터 코드 접근입니다.`);
     return res.status(401).json({ 
       success: false, 
       error: "USED_CODE", 
@@ -194,17 +195,17 @@ app.post('/api/user/validate-profile', async (req, res) => {
       [schul_code, grade, class_num, username, device_id, decodedId]
     );
     if (dupUser) {
-      console.log(`   └─ [❌ 사칭 경고] 중복 기기 식별값 검출됨: ${dupUser.device_id}`);
+      console.log(`    └─ [❌ 사칭 경고] 중복 기기 식별값 검출됨: ${dupUser.device_id}`);
       return res.status(403).json({ 
         success: false, 
         error: "IMPERSONATION_DETECTED",
         message: "🚨 이미 다른 기기에서 등록된 학생 이름과 학반입니다. 사칭 방지를 위해 등록할 수 없습니다. 본인이 맞다면 관리자에게 문의하세요."
       });
     }
-    console.log(`   └─ [✅ 검증 통과] 등록 가능한 고유 정보입니다.`);
+    console.log(`    └─ [✅ 검증 통과] 등록 가능한 고유 정보입니다.`);
     res.json({ success: true });
   } catch (err) {
-    console.error(`   └─ [💥 에러]:`, err.message);
+    console.error(`    └─ [💥 에러]:`, err.message);
     res.status(500).json({ success: false, error: "검증 실패" });
   }
 });
@@ -217,14 +218,14 @@ app.get('/api/user/:device_id', async (req, res) => {
     const user = await dbGet('SELECT * FROM users WHERE device_id = ? OR device_id = ?', [rawId, decodedId]);
     
     if (!user) {
-      console.log(`   └─ [🔎 조회결과 없음] 신규 등록이 필요합니다.`);
+      console.log(`    └─ [🔎 조회결과 없음] 신규 등록이 필요합니다.`);
       return res.status(404).json({ error: '유저 없음', requested_id: decodedId });
     }
     
     const currentTodayStr = getKstDateString();
     const isSameDay = user.last_saved_date === currentTodayStr;
 
-    console.log(`   └─ [🎉 유저 확인 완료] 이름: ${user.username} | 누적 걸음수: ${user.steps_total}`);
+    console.log(`    └─ [🎉 유저 확인 완료] 이름: ${user.username} | 누적 걸음수: ${user.steps_total}`);
     res.json({
       success: true,
       user: {
@@ -236,7 +237,7 @@ app.get('/api/user/:device_id', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(`   └─ [💥 에러]:`, error.message);
+    console.error(`    └─ [💥 에러]:`, error.message);
     res.status(500).json({ error: '유저 조회 실패' });
   }
 });
@@ -249,7 +250,7 @@ app.get('/api/notifications/unread/:device_id', async (req, res) => {
     const user = await dbGet('SELECT last_read_noti_id FROM users WHERE device_id = ? OR device_id = ?', [req.params.device_id, decodedId]);
     const lastId = user ? (user.last_read_noti_id || 0) : 0;
     const unreadList = await dbAll('SELECT * FROM notifications WHERE id > ? ORDER BY id ASC', [lastId]);
-    console.log(`   └─ 안읽은 알림 개수: ${unreadList.length}개 (마지막 확인 ID: ${lastId})`);
+    console.log(`    └─ 안읽은 알림 개수: ${unreadList.length}개 (마지막 확인 ID: ${lastId})`);
     res.json({ success: true, list: unreadList });
   } catch (error) { res.status(500).json({ error: '알림 조회 실패' }); }
 });
@@ -288,7 +289,7 @@ app.post('/api/cheers', async (req, res) => {
     const isAdmin = (dbAdminFlag || adminKeywords.some(kw => username.includes(kw))) ? 1 : 0;
 
     if (isMuted && !isAdmin) {
-      console.log(`   └─ [⛔ 차단 필터] 뮤트 상태인 유저의 작성 시도가 제지되었습니다.`);
+      console.log(`    └─ [⛔ 차단 필터] 뮤트 상태인 유저의 작성 시도가 제지되었습니다.`);
       return res.status(403).json({ error: '귀하는 관리자에 의해 서비스 이용 수칙 위반으로 채팅 작성이 제한(잠금)되었습니다.' });
     }
 
@@ -371,7 +372,7 @@ app.post('/api/steps', async (req, res) => {
       [data.schul_code, finalGrade, finalClass, finalUsername, data.device_id, decodedId]
     );
     if (dupUser) {
-      console.log(`   └─ [❌ 사칭 차단] 실시간 동기화 거부됨 (${finalUsername})`);
+      console.log(`    └─ [❌ 사칭 차단] 실시간 동기화 거부됨 (${finalUsername})`);
       return res.status(403).json({ error: "IMPERSONATION_DETECTED", message: "🚨 이미 다른 기기에서 등록된 이름입니다. 사칭 방지를 위해 저장할 수 없습니다." });
     }
 
@@ -391,11 +392,11 @@ app.post('/api/steps', async (req, res) => {
     if (existing) {
       await dbRun(`UPDATE users SET device_id=?, username=?, school=?, schul_code=?, atpt_code=?, school_kind=?, school_lat=?, school_lng=?, grade=?, class_num=?, steps_today=?, steps_total=?, is_commuted=?, commute_time=?, level=?, commute_count=?, last_saved_date=?, updatedAt=? WHERE device_id=?`,
         [decodedId, finalUsername, data.school, data.schul_code, data.atpt_code, data.school_kind, data.school_lat, data.school_lng, finalGrade, finalClass, stepsTodayCalculated, data.steps_total, isCommutedCalculated ? 1 : 0, commuteTimeCalculated, finalLevel, newCommuteCount, currentTodayStr, new Date().toISOString(), existing.device_id]);
-      console.log(`   └─ [DB UPDATE] 기존 유저 정보 업데이트 성골`);
+      console.log(`    └─ [DB UPDATE] 기존 유저 정보 업데이트 성골`);
     } else {
       await dbRun(`INSERT INTO users (device_id, username, school, schul_code, atpt_code, school_kind, school_lat, school_lng, grade, class_num, steps_today, steps_total, is_commuted, commute_time, level, commute_count, last_saved_date, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [decodedId, finalUsername, data.school, data.schul_code, data.atpt_code, data.school_kind, data.school_lat, data.school_lng, finalGrade, finalClass, stepsTodayCalculated, data.steps_total, isCommutedCalculated ? 1 : 0, commuteTimeCalculated, finalLevel, newCommuteCount, currentTodayStr, new Date().toISOString()]);
-      console.log(`   └─ [DB INSERT] 신규 유저 생성 성공`);
+      console.log(`    └─ [DB INSERT] 신규 유저 생성 성공`);
     }
 
     res.json({ 
@@ -413,7 +414,7 @@ app.post('/api/steps', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(`   └─ [💥 DB 처리 실패]:`, error);
+    console.error(`    └─ [💥 DB 처리 실패]:`, error);
     res.status(500).json({ error: '서버 데이터베이스 처리 실패' });
   }
 });
@@ -523,7 +524,7 @@ app.get('/api/admin/cheers', async (req, res) => {
   }
 });
 
-app.delete('/api/admin/cheers/:id', async (req, res) => {
+delete app.delete('/api/admin/cheers/:id', async (req, res) => {
   console.log(`[🛠️ 관리자] 방명록 피드 삭제 요구 ID: ${req.params.id}`);
   try {
     await dbRun('DELETE FROM cheers WHERE id = ?', [req.params.id]);
@@ -675,12 +676,15 @@ app.post('/api/admin/unban', async (req, res) => {
 });
 
 /* =================================================================
-    서버 구동부
+    서버 구동부 (Render 환경 변수 자동 연동 반영)
    ================================================================= */
 app.listen(PORT, '0.0.0.0', () => {
+  // 🔄 Render가 발급해 준 전용 외부 URL 환경 변수를 가져옵니다. 없을 경우 로컬 호스트로 주소를 만듭니다.
+  const currentRunningUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+
   console.log(`=================================================`);
   console.log(` 등교 유도 앱 GreenStep 백엔드 서버 가동 중 `);
-  console.log(` 외부 접속 주소: http://dc.wrd.kr:${PORT} `);
+  console.log(` 외부 접속 주소: ${currentRunningUrl} `);
   console.log(`-------------------------------------------------`);
   console.log(` 🔐 [실시간 보안 관리자 인증코드 발급 안내] `);
   console.log(` 오늘의 최초 로그인 일회용 비밀번호: ${tempMasterCode} `);
